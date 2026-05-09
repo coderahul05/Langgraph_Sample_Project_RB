@@ -1,307 +1,169 @@
-# Hospital Medicine Inventory Manager -- Learn LangGraph Step by Step
+# Mental Wellness Practice Suggester - Learn LangGraph Step by Step
 
-A beginner-friendly project to learn the LangGraph framework by building a hospital medicine inventory check system.
+A beginner-friendly LangGraph project that suggests personalized calming
+practices based on how a user is feeling.
 
----
+The project demonstrates a clear LangGraph pattern:
 
-## Understanding LangGraph Through the Tiffin Box Analogy
-
-Before diving into code, let us understand how LangGraph works using the **Tiffin Box** (Indian lunch box) analogy.
-
-A tiffin box has multiple compartments. Imagine a kitchen where 3 cooks prepare different compartments at the same time (parallel), a supervisor checks the quality (conditional), and either packs it for delivery or sends it back for fixing.
-
-LangGraph works the same way -- but instead of food, we pass **data (state)** through **nodes (functions)** connected by **edges (arrows)**.
-
-```
-    THE TIFFIN BOX ANALOGY FOR LANGGRAPH
-    =====================================
-
-    Think of LangGraph as a kitchen assembly line:
-
-    +----------------------------------------------------------+
-    |                                                          |
-    |   TIFFIN BOX = STATE (Pydantic Model)                   |
-    |   The box travels through the kitchen.                   |
-    |   Each station fills one compartment.                    |
-    |                                                          |
-    |   +-------------+  +-------------+  +-------------+     |
-    |   | Compartment |  | Compartment |  | Compartment |     |
-    |   |   (rice)    |  |   (curry)   |  |   (salad)   |     |
-    |   +-------------+  +-------------+  +-------------+     |
-    |                                                          |
-    +----------------------------------------------------------+
-
-    NODES = Kitchen Stations (each does one job)
-    EDGES = Conveyor belts connecting stations
-    PARALLEL NODES = Multiple cooks working at the same time
-    CONDITIONAL EDGE = Supervisor deciding: "Pack it or fix it?"
-
-    How data flows:
-
-    [Customer Order]                         <-- START node
-          |
-          v
-    +-----------+
-    | Take Order|                            <-- Node 1
-    +-----------+
-          |
-     _____|_____________________
-    |            |              |
-    v            v              v
-  +------+   +-------+   +-------+
-  | Rice |   | Curry |   | Salad |           <-- Parallel Nodes
-  +------+   +-------+   +-------+              (Fan-Out)
-    |            |              |
-    |____________|______________|
-                 |
-                 v                               (Fan-In)
-         +--------------+
-         | Quality Check|                    <-- Decision Node
-         +--------------+
-                 |
-           ______|______
-          |             |
-     [PASS]         [FAIL]                   <-- Conditional Edge
-          |             |
-          v             v
-    +----------+   +----------+
-    |  Pack    |   |   Fix    |--+
-    |  Tiffin  |   |   Meal   |  |
-    +----------+   +----------+  |
-          |             |        |
-          v             +--------+           <-- Loop (retry)
-        [END]
-
-
-    KEY LANGGRAPH CONCEPTS:
-    -----------------------
-    1. STATE    = The tiffin box itself (holds all data)
-    2. NODE     = A kitchen station (a function that does one thing)
-    3. EDGE     = A conveyor belt (connects one node to the next)
-    4. PARALLEL = Multiple stations working at the same time
-    5. FAN-IN   = Waiting for all parallel stations to finish
-    6. CONDITIONAL EDGE = A supervisor deciding the next step
+```text
+[User Feeling]
+      |
+      v
+understand_mood
+      |
+      +--> suggest_breathing ----+
+      +--> suggest_mindfulness --+--> pick_best_practice
+      +--> suggest_movement -----+          |
+                                         conditional
+                                      /              \
+                              quick_practice     deep_practice
+                                      |              |
+                                     END            END
 ```
 
 ---
 
-## Our Project: Hospital Medicine Inventory Check
+## What This Project Does
 
-Now we apply the same pattern to a real use case. A pharmacist enters a medicine name, and the system runs parallel checks, then makes a decision.
+A user enters a feeling such as:
 
-```
-    HOSPITAL INVENTORY CHECK -- GRAPH ARCHITECTURE
-    ================================================
+- `I feel stressed before my exam`
+- `I cannot sleep and my mind is racing`
+- `I feel anxious and overwhelmed`
 
-              +------------------+
-              |      START       |
-              +--------+---------+
-                       |
-              +--------v---------+
-              | receive_request   |     Pharmacist enters medicine name.
-              +--------+---------+     System acknowledges the request.
-                       |
-          _____________|_______________
-         |             |               |
-         v             v               v
-  +-----------+  +-----------+  +----------------+
-  | check     |  | check     |  | check          |    3 PARALLEL NODES
-  | stock     |  | expiry    |  | supplier       |    (Fan-Out)
-  | level     |  | dates     |  | availability   |
-  +-----------+  +-----------+  +----------------+    Each node writes to
-         |             |               |              its own state field.
-         |_____________|_______________|              No conflicts.
-                       |
-              +--------v---------+
-              | inventory        |                    FAN-IN:
-              | decision         |                    Waits for all 3 checks.
-              +--------+---------+                    Reads all results.
-                       |                              Decides: reorder or not?
-                 ______|______
-                |             |
-          [REORDER]       [ALL OK]                    CONDITIONAL EDGE:
-                |             |                       route_after_decision()
-                v             v                       returns "reorder" or "report"
-         +------------+ +---------------+
-         | place      | | generate      |
-         | reorder    | | report        |
-         +-----+------+ +-------+------+
-               |                 |
-               v                 v
-             [END]             [END]
+The graph then:
 
+1. Understands the user mood.
+2. Runs three specialist suggestion nodes in parallel:
+   - breathing specialist
+   - mindfulness specialist
+   - gentle movement specialist
+3. Uses a decision node to choose whether the user needs:
+   - a quick practice under 5 minutes, or
+   - a deeper 10-15 minute session
+4. Routes to the correct final node.
+5. Prints the personalized wellness practice and message log.
 
-    STATE FIELDS (Pydantic Model):
-    ================================
-    medicine_name      --> Input: what medicine to check
-    stock_status       --> Filled by: check_stock_level
-    expiry_status      --> Filled by: check_expiry_dates
-    supplier_status    --> Filled by: check_supplier_availability
-    needs_reorder      --> Filled by: inventory_decision
-    decision_reason    --> Filled by: inventory_decision
-    final_report       --> Filled by: place_reorder OR generate_report
-    messages           --> Accumulated by ALL nodes (uses operator.add)
+---
+
+## LangGraph Concepts Covered
+
+| Concept | Where It Appears |
+|---|---|
+| State | `WellnessState` Pydantic model |
+| Nodes | `understand_mood`, `suggest_breathing`, `suggest_mindfulness`, `suggest_movement`, `pick_best_practice`, `quick_practice`, `deep_practice` |
+| Parallel execution | Three suggestion nodes run after `understand_mood` |
+| Fan-in | All three specialist suggestions flow into `pick_best_practice` |
+| Conditional edges | `route_after_decision` sends the graph to quick or deep practice |
+| Final output | `quick_practice` or `deep_practice` |
+| Message accumulation | `messages: Annotated[list, operator.add]` |
+
+---
+
+## Project Files
+
+```text
+mental_wellness_graph.py   Main LangGraph project
+architecture.md            Architecture explanation
+architecture.drawio        Diagram source file
+requirements.txt           Python dependencies
+.env.example               Example environment file
+.gitignore                 Ignored local files
 ```
 
 ---
 
-## How LangGraph State Works
+## Setup
 
-```
-    HOW STATE FLOWS THROUGH THE GRAPH
-    ===================================
+### 1. Create and activate a virtual environment
 
-    Initial State (before graph runs):
-    +-----------------------------------+
-    | medicine_name: "Paracetamol 500mg"|
-    | stock_status: ""                  |
-    | expiry_status: ""                 |
-    | supplier_status: ""               |
-    | needs_reorder: False              |
-    | final_report: ""                  |
-    | messages: []                      |
-    +-----------------------------------+
-                    |
-                    v
-        [receive_request runs]
-                    |
-                    v
-    After receive_request:
-    +-----------------------------------+
-    | medicine_name: "Paracetamol 500mg"|  <-- unchanged
-    | stock_status: ""                  |  <-- not yet filled
-    | expiry_status: ""                 |  <-- not yet filled
-    | supplier_status: ""               |  <-- not yet filled
-    | messages: ["[receive_request]..."]|  <-- appended
-    +-----------------------------------+
-                    |
-        ____________|____________
-       |            |            |
-       v            v            v
-    [3 parallel nodes run, each fills ONE field]
-                    |
-                    v
-    After parallel nodes:
-    +-----------------------------------+
-    | stock_status: "Current: 150..."   |  <-- filled by check_stock_level
-    | expiry_status: "Batch A: 2025..." |  <-- filled by check_expiry_dates
-    | supplier_status: "MedCorp: 3..."  |  <-- filled by check_supplier_availability
-    | messages: [..., stock, expiry,    |  <-- all 3 appended (operator.add)
-    |            supplier messages]     |
-    +-----------------------------------+
-                    |
-                    v
-    After inventory_decision:
-    +-----------------------------------+
-    | needs_reorder: True               |  <-- decision made
-    | decision_reason: "Stock is low"   |  <-- reason captured
-    +-----------------------------------+
-                    |
-           [conditional edge]
-           needs_reorder = True
-                    |
-                    v
-    After place_reorder:
-    +-----------------------------------+
-    | final_report: "REORDER REQUEST.."|  <-- final output
-    +-----------------------------------+
+```powershell
+python -m venv venv
+venv\Scripts\activate
 ```
 
----
-
-## Setup and Run
-
-### Prerequisites
-- Python 3.10 or higher
-- An OpenAI API key
-
-### Steps
+On macOS/Linux:
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/NisargKadam/langgraph_framework.git
-cd langgraph_framework
-
-# 2. Create a virtual environment
 python -m venv venv
-source venv/bin/activate        # On Windows: venv\Scripts\activate
+source venv/bin/activate
+```
 
-# 3. Install dependencies
+### 2. Install dependencies
+
+```powershell
 pip install -r requirements.txt
-
-# 4. Set up your API key
-cp .env.example .env
-# Edit .env and add your OpenAI API key
-
-# 5. Run the inventory check
-python hospital_inventory_graph.py
 ```
 
-### Expected Output
+### 3. Configure your OpenAI API key
 
+```powershell
+copy .env.example .env
 ```
-============================================================
-  HOSPITAL MEDICINE INVENTORY CHECK
-  Medicine: Paracetamol 500mg
-============================================================
 
---- Receiving request for: Paracetamol 500mg ---
-Request acknowledged: Paracetamol 500mg is a commonly used analgesic and...
+Edit `.env` and add your API key:
 
---- [Parallel] Checking stock level for: Paracetamol 500mg ---
---- [Parallel] Checking expiry dates for: Paracetamol 500mg ---
---- [Parallel] Checking supplier availability for: Paracetamol 500mg ---
-Stock check done: Current quantity: 150 units...
-Expiry check done: Batch A expires: 2025-08-15...
-Supplier check done: Primary supplier: MedCorp...
-
---- Making inventory decision for: Paracetamol 500mg ---
-Decision: STOCK OK -- All stock levels are sufficient...
-
---- Generating report for: Paracetamol 500mg ---
-
-============================================================
-  FINAL RESULT
-============================================================
-
-INVENTORY REPORT -- ALL CLEAR
-========================================
-Paracetamol 500mg inventory is in good standing...
-
-------------------------------------------------------------
-  MESSAGE LOG (shows the order nodes executed)
-------------------------------------------------------------
-  [receive_request] Checking inventory for Paracetamol 500mg
-  [check_stock_level] Completed stock check
-  [check_expiry_dates] Completed expiry check
-  [check_supplier_availability] Completed supplier check
-  [inventory_decision] Decision: reorder=False
-  [generate_report] Status report generated
+```text
+OPENAI_API_KEY=sk-...
 ```
+
+Never commit your real `.env` file.
+
+### 4. Run the project
+
+```powershell
+python mental_wellness_graph.py
+```
+
+---
+
+## Expected Flow
+
+Example input:
+
+```text
+I feel anxious and overwhelmed because I have too much work.
+```
+
+The graph will:
+
+1. Acknowledge the feeling.
+2. Generate a breathing technique.
+3. Generate a mindfulness or grounding exercise.
+4. Generate a gentle movement suggestion.
+5. Decide whether the user needs a quick or deeper practice.
+6. Print the final personalized practice.
+7. Print the message log showing which nodes executed.
 
 ---
 
 ## Code Walkthrough
 
-| Step | What Happens | File Location |
-|------|-------------|---------------|
-| 1 | Define `InventoryState` with Pydantic | `hospital_inventory_graph.py` line 50 |
-| 2 | Initialize OpenAI LLM | `hospital_inventory_graph.py` line 72 |
-| 3 | Define 6 node functions | `hospital_inventory_graph.py` lines 88-230 |
-| 4 | Define routing function | `hospital_inventory_graph.py` line 244 |
-| 5 | Build graph (add nodes + edges) | `hospital_inventory_graph.py` lines 260-310 |
-| 6 | Compile and run | `hospital_inventory_graph.py` lines 320-360 |
+| Step | What Happens | File |
+|---|---|---|
+| 1 | Define `WellnessState` | `mental_wellness_graph.py` |
+| 2 | Initialize `ChatOpenAI` | `mental_wellness_graph.py` |
+| 3 | Define graph node functions | `mental_wellness_graph.py` |
+| 4 | Define `route_after_decision` | `mental_wellness_graph.py` |
+| 5 | Add nodes and edges to `StateGraph` | `mental_wellness_graph.py` |
+| 6 | Compile graph as `app` | `mental_wellness_graph.py` |
+| 7 | Run with `run_wellness_check()` | `mental_wellness_graph.py` |
 
 ---
 
-## Key Takeaways for Beginners
+## Important Note
 
-1. **State is just a data class** -- Define what data your graph needs using Pydantic fields with defaults.
+This is a learning project, not a medical or therapy tool. The output is meant
+for general wellness practice suggestions only. For crisis situations, medical
+concerns, self-harm thoughts, or severe distress, users should contact local
+emergency services or a qualified mental health professional.
 
-2. **Nodes are just functions** -- Each function takes state, does one thing, returns a dict of updated fields.
+---
 
-3. **Parallel is automatic** -- Add multiple edges from one node to many, and LangGraph runs them in parallel.
+## Key Takeaways
 
-4. **Conditional edges need a routing function** -- Write a function that returns a string key, map keys to node names.
-
-5. **The graph is just a flowchart** -- You define it in code the same way you would draw it on paper.
+1. State holds the data that travels through the graph.
+2. Nodes are normal Python functions that read state and return updates.
+3. Parallel execution happens when one node connects to multiple next nodes.
+4. Fan-in happens when multiple nodes connect into one later node.
+5. Conditional edges let the graph choose the next path at runtime.

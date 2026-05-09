@@ -65,6 +65,7 @@ class WellnessState(BaseModel):
     breathing_suggestion: str = ""
     mindfulness_suggestion: str = ""
     movement_suggestion: str = ""
+    movie_suggestion: str = ""
     needs_deep_session: bool = False
     practice_reason: str = ""
     final_suggestion: str = ""
