@@ -480,7 +480,7 @@ recommends what to watch.
 
 ---
 
-### 22. Rahul Bhatia - Startup Idea Validator Graph
+### 22. Rahul Bhatia Test - Startup Idea Validator Graph
 
 **Use Case:** A user describes a startup idea. The graph evaluates and refines it.
 
